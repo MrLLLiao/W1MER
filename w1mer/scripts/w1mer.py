@@ -7,7 +7,7 @@ INDEX files are build artifacts (single-direction sync).
 
 Commands:
   init                    scaffold .w1mer/ from templates (incl. schema.yaml)
-  install                 install host agents + CLI launcher (--host, --link)
+  install                 install host agents (+ host skill dir) + CLI launcher (--host, --link)
   batch-start <task>      record the batch boundary commit (gates completeness)
   batch-end <task>        explicitly close the current task (end = HEAD)
   ensure <task>           idempotently make this task current (subagent startup)
@@ -55,6 +55,13 @@ HOSTS = {
     "codex": {
         "agents": SKILL_ROOT / "hosts" / "codex" / "agents",
         "dest": Path.home() / ".codex" / "agents",
+    },
+    "trae": {
+        "agents": SKILL_ROOT / "hosts" / "trae" / "agents",
+        "dest": Path.home() / ".trae-cn" / "agents",
+        # TRAE does not discover skills from a global CLI scope, so the skill
+        # itself is copied into TRAE's skill directory by install.
+        "skill_dest": Path.home() / ".trae-cn" / "skills" / SKILL_ROOT.name,
     },
 }
 
@@ -420,6 +427,25 @@ def install_cli(bin_dir, link=False):
     return True
 
 
+def install_skill_tree(dest):
+    """Copy the whole skill directory into a host's skill directory.
+
+    Hosts like TRAE discover skills from a fixed directory (~/.trae-cn/skills/)
+    rather than from the CLI's global scope, so installing the agent
+    definitions alone would leave the skill invisible to the host."""
+    src = SKILL_ROOT
+    dest = Path(dest)
+    if src.resolve() == dest.resolve():
+        print(f"skill already in place -> {dest}")
+        return
+    if src.resolve() in dest.resolve().parents:
+        sys.exit(f"error: skill destination {dest} is inside the skill directory; refusing to copy")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"))
+    print(f"installed skill -> {dest}")
+
+
 def cmd_install(args):
     host = args.host
     hosts = [host] if host != "all" else list(HOSTS)
@@ -430,6 +456,8 @@ def cmd_install(args):
         for h in hosts:
             spec = HOSTS[h]
             print(f"[{h}] {spec['dest']} <- {spec['agents']}")
+            if spec.get("skill_dest"):
+                print(f"[{h}] skill {spec['skill_dest']} <- {SKILL_ROOT}")
         if not args.no_cli:
             print(f"[cli] {pick_bin_dir() or 'NO WRITABLE PATH DIR'} <- {SKILL_ROOT / 'scripts' / 'w1mer.py'}")
         return
@@ -438,13 +466,15 @@ def cmd_install(args):
         src, dest = spec["agents"], spec["dest"]
         if not src.is_dir():
             print(f"warning: no agent definitions at {src}")
-            continue
-        dest.mkdir(parents=True, exist_ok=True)
-        n = 0
-        for f in sorted(list(src.glob("*.md")) + list(src.glob("*.toml"))):
-            shutil.copy2(f, dest / f.name)
-            n += 1
-        print(f"installed {n} agent(s) -> {dest}")
+        else:
+            dest.mkdir(parents=True, exist_ok=True)
+            n = 0
+            for f in sorted(list(src.glob("*.md")) + list(src.glob("*.toml"))):
+                shutil.copy2(f, dest / f.name)
+                n += 1
+            print(f"installed {n} agent(s) -> {dest}")
+        if spec.get("skill_dest"):
+            install_skill_tree(spec["skill_dest"])
     if not args.no_cli:
         bin_dir = Path(args.bin_dir) if args.bin_dir else pick_bin_dir()
         if bin_dir is None:
@@ -1206,7 +1236,7 @@ def main():
     p_rj.add_argument("role")
 
     p_install = sub.add_parser("install", help="install host agents + CLI launcher")
-    p_install.add_argument("--host", default="opencode", help="opencode | claude-code | codex | all (default: opencode)")
+    p_install.add_argument("--host", default="opencode", help="opencode | claude-code | codex | trae | all (default: opencode)")
     p_install.add_argument("--no-cli", action="store_true", help="skip installing the w1mer CLI launcher")
     p_install.add_argument("--link", action="store_true", help="symlink the CLI to the skill instead of a launcher script")
     p_install.add_argument("--bin-dir", default=None, help="directory to install the CLI launcher (default: first writable PATH dir)")

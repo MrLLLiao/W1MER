@@ -167,17 +167,35 @@ directory (e.g. `npx skills add pjh456/w1mer -a opencode -g`, or copy the
 `w1mer/` directory), then register the host agents and the CLI:
 
 ```sh
-python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|all]
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|trae|all]
                                             [--link] [--bin-dir <dir>]
 ```
 
 `install` copies each host's agent definitions into its agent directory
 (opencode → `~/.config/opencode/agents/`, claude-code → `~/.claude/agents/`,
-codex → `~/.codex/agents/`) and puts a `w1mer` launcher on PATH (symlink the
-skill script with `--link`). `install --list` shows the target locations
-without changing anything. On Windows the launcher is a `.bat` that forwards
-to the skill script. Codex reads agents as TOML files and discovers the skill
-itself from `~/.agents/skills/` (USER scope) automatically.
+codex → `~/.codex/agents/`, trae → `~/.trae-cn/agents/`) and puts a `w1mer`
+launcher on PATH (symlink the skill script with `--link`). `install --list`
+shows the target locations without changing anything. On Windows the launcher
+is a `.bat` that forwards to the skill script. Codex reads agents as TOML
+files and discovers the skill itself from `~/.agents/skills/` (USER scope)
+automatically.
+
+### TRAE
+
+TRAE loads custom subagents from `~/.trae-cn/agents/` (user scope) or
+`<project>/.trae/agents/` (project scope), and discovers skills only from
+`~/.trae-cn/skills/` — so `install --host trae` copies the skill itself there
+as well. Two things to know:
+
+- Enable *Settings → Beta → Subagents*, otherwise TRAE never loads the agent
+  files. The skill's documented fallback still works without it: read
+  `hosts/trae/agents/<role>.md`, drop the frontmatter, and dispatch a
+  general-purpose subagent with that body plus the task id.
+- TRAE's subagent frontmatter has no per-command Bash allow-list (no
+  `Bash(git diff*)` syntax), so the read-only roles are read-only by prompt
+  discipline rather than by sandbox. Compile exclusivity stays
+  protocol-enforced: the implementer is the only agent that builds or commits
+  while a batch is active.
 
 ## Project layout
 
@@ -194,7 +212,8 @@ W1MER/
     └── hosts/          #   host-specific agent definitions
         ├── opencode/   #     .opencode/agent/*.md (install → ~/.config/opencode/agents/)
         ├── claude-code/    #   .claude/agents/*.md
-        └── codex/      #     .codex/agents/*.toml (install → ~/.codex/agents/)
+        ├── codex/      #     .codex/agents/*.toml (install → ~/.codex/agents/)
+        └── trae/       #     agents/*.md (install → ~/.trae-cn/agents/)
 ```
 
 ## Status

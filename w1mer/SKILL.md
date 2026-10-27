@@ -160,18 +160,47 @@ orchestration, then as needed:
 - `references/map-codebase.md` — map-reduce per-module mapping.
 
 Host-specific agent definitions live in `hosts/` (opencode, claude-code,
-codex), shipped inside the skill. Install the skill (e.g. `npx skills add
+codex, trae), shipped inside the skill. Install the skill (e.g. `npx skills add
 <owner>/w1mer -a opencode -g` or copy this directory), then register host
 agents and the CLI:
 
 ```sh
-python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|all]
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|trae|all]
                                             [--link] [--bin-dir <dir>]
 ```
 
 `install` copies each host's agent definitions to its agent directory
 (opencode → `~/.config/opencode/agents/`, claude-code → `~/.claude/agents/`,
-codex → `~/.codex/agents/`) and puts a `w1mer` launcher on PATH (symlink the
-skill script with `--link`). `install --list` prints the target locations
-without changing anything. Codex reads agents as TOML files and picks up the
-skill itself from `~/.agents/skills/` automatically.
+codex → `~/.codex/agents/`, trae → `~/.trae-cn/agents/`) and puts a `w1mer`
+launcher on PATH (symlink the skill script with `--link`). `install --list`
+prints the target locations without changing anything. Codex reads agents as
+TOML files and picks up the skill itself from `~/.agents/skills/`
+automatically; TRAE discovers skills only from its own skill directory, so
+`install --host trae` also copies the skill to `~/.trae-cn/skills/w1mer/`.
+
+### TRAE (TRAE IDE / TRAE CN)
+
+TRAE's custom subagents are Markdown files in `~/.trae-cn/agents/` (user
+scope) or `<project>/.trae/agents/` (project scope). Only the built-in
+**Agent** can invoke a subagent, and it chooses one by matching the
+subagent's `description`.
+
+- **Prerequisite**: enable *Settings → Beta → Subagents*. With the switch off,
+  TRAE never loads `~/.trae-cn/agents/` and only the fallback below works.
+- **Dispatch**: the orchestrator (the built-in Agent) runs
+  `w1mer batch-start <task>`, then dispatches the batch's roles. Prefer the
+  named subagents `w1mer-reviewer` / `w1mer-implementer` / `w1mer-explorer`
+  (plus `w1mer-fixer` for sub batches) when the host offers them by name.
+- **Fallback** (Beta off, or the named subagents are not selectable): read
+  `hosts/trae/agents/<role>.md`, drop the YAML frontmatter, and spawn a
+  general-purpose subagent with that body plus the task id. Same protocol,
+  no dependency on the Beta feature.
+- **Fidelity caveat**: TRAE's subagent frontmatter has no per-command Bash
+  allow-list (no `Bash(git diff*)` syntax), so the read-only roles —
+  reviewer and explorer — are read-only by prompt discipline rather than by
+  sandbox. Keep their `Bash` usage to read commands and route every archive
+  write through the `w1mer` CLI. The implementer's compile exclusivity is
+  likewise protocol-enforced: it is the only agent that builds or commits
+  while a batch is active.
+- Mappers are dispatched one instance per module in parallel, exactly as in
+  `references/map-codebase.md`.

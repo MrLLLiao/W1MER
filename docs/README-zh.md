@@ -113,11 +113,18 @@ W1MER 的 codebase 文档分两层：
 skill 包是自包含的——安装到宿主机的 skill 目录（如 `npx skills add pjh456/w1mer -a opencode -g`，或直接复制 `w1mer/` 目录），然后注册 host agents 与 CLI：
 
 ```sh
-python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|all]
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|trae|all]
                                             [--link] [--bin-dir <dir>]
 ```
 
-`install` 会把各 host 的 agent 定义复制到对应 agent 目录（opencode → `~/.config/opencode/agents/`，claude-code → `~/.claude/agents/`，codex → `~/.codex/agents/`），并在 PATH 上安装 `w1mer` 启动器（`--link` 改为 symlink 指向 skill 脚本）。`install --list` 只显示目标位置、不改动任何东西。Windows 上启动器为转发到 skill 脚本的 `.bat`。Codex 以 TOML 读取 agent，并会自动从 `~/.agents/skills/`（USER 作用域）发现 skill 本体。
+`install` 会把各 host 的 agent 定义复制到对应 agent 目录（opencode → `~/.config/opencode/agents/`，claude-code → `~/.claude/agents/`，codex → `~/.codex/agents/`，trae → `~/.trae-cn/agents/`），并在 PATH 上安装 `w1mer` 启动器（`--link` 改为 symlink 指向 skill 脚本）。`install --list` 只显示目标位置、不改动任何东西。Windows 上启动器为转发到 skill 脚本的 `.bat`。Codex 以 TOML 读取 agent，并会自动从 `~/.agents/skills/`（USER 作用域）发现 skill 本体。
+
+### TRAE（Trae IDE / Trae CN）
+
+TRAE 从 `~/.trae-cn/agents/`（用户级）或 `<项目>/.trae/agents/`（项目级）加载自定义 Subagent，且只从 `~/.trae-cn/skills/` 发现 skill 本体——因此 `install --host trae` 会顺带把 skill 自己复制过去。两点须知：
+
+- 需要在 *设置 → Beta → Subagents* 里打开开关，否则 TRAE 根本不会加载那些 agent 文件。开关没开也能用 skill 里写明的兜底路径：读 `hosts/trae/agents/<角色>.md`，去掉 frontmatter，用它的正文 + 任务号去派一个通用子代理。
+- TRAE 的 Subagent frontmatter 没有按命令限定的 Bash 白名单（没有 `Bash(git diff*)` 这种语法），所以只读角色是「提示词约束的只读」而非「沙箱只读」。编译独占依然是协议约束：一个批次里只有实现者会构建和提交。
 
 ## 项目布局
 
@@ -134,7 +141,8 @@ W1MER/
     └── hosts/          #   宿主特定的 agent 定义
         ├── opencode/   #     .opencode/agent/*.md（install → ~/.config/opencode/agents/）
         ├── claude-code/    #   .claude/agents/*.md
-        └── codex/      #     .codex/agents/*.toml（install → ~/.codex/agents/）
+        ├── codex/      #     .codex/agents/*.toml（install → ~/.codex/agents/）
+        └── trae/       #     agents/*.md（install → ~/.trae-cn/agents/）
 ```
 
 ## 状态
